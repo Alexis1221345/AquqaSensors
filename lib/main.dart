@@ -6,6 +6,8 @@ import 'core/theme/app_theme.dart';
 import 'shared/providers/auth_provider.dart';
 import 'shared/providers/sensor_provider.dart';
 import 'shared/providers/arduino_provider.dart';
+import 'shared/providers/pool_provider.dart';
+import 'shared/providers/pool_dashboard_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +25,8 @@ class AquaSensorsApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => SensorProvider()),
         ChangeNotifierProvider(create: (_) => ArduinoProvider()),
+        ChangeNotifierProvider(create: (_) => PoolProvider()),
+        ChangeNotifierProvider(create: (_) => PoolDashboardProvider()),
       ],
       child: MaterialApp(
         title: 'AquaSensors',

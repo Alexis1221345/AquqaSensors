@@ -13,6 +13,7 @@ class Pool3dPreview extends StatelessWidget {
   final double? diametroM;
   final double? profMinimaM;
   final double? profMaximaM;
+  final String? tipo;
   final double height;
   final bool showDimensionBadge;
 
@@ -23,17 +24,55 @@ class Pool3dPreview extends StatelessWidget {
     this.diametroM,
     this.profMinimaM,
     this.profMaximaM,
+    this.tipo,
     this.height = 250,
     this.showDimensionBadge = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final largo   = (largoM   ?? diametroM ?? 10).clamp(1.0, 60.0);
-    final ancho   = (anchoM   ?? diametroM ??  5).clamp(1.0, 60.0);
-    final profMin = (profMinimaM ?? 1.2).clamp(0.4, 6.0);
-    final profMax = (profMaximaM ?? profMin).clamp(profMin, 8.0);
+    final poolType = (tipo ?? '').trim().toLowerCase();
+    final isCircular = poolType == 'circular';
+    final isOval = poolType == 'ovalada';
+    final isRoundedRect = poolType == 'ovalada_rectos';
+
+    final largo = (largoM ?? diametroM ?? 10).clamp(1.0, 60.0).toDouble();
+    final ancho = (anchoM ?? diametroM ?? largo).clamp(1.0, 60.0).toDouble();
+    final diametro = (diametroM ?? math.max(largo, ancho)).clamp(1.0, 60.0).toDouble();
+    final profMin = (profMinimaM ?? 1.2).clamp(0.4, 6.0).toDouble();
+    final profMax = (profMaximaM ?? profMin).clamp(profMin, 8.0).toDouble();
     final profMed = (profMin + profMax) / 2;
+
+    final svg = isCircular
+        ? _Pool3dSvg.buildCircular(
+            diameter: diametro,
+            profMin: profMin,
+            profMax: profMax,
+          )
+        : isOval
+            ? _Pool3dSvg.buildOval(
+                largo: largo,
+                ancho: ancho,
+                profMin: profMin,
+                profMax: profMax,
+              )
+            : isRoundedRect
+                ? _Pool3dSvg.buildRoundedRect(
+                    largo: largo,
+                    ancho: ancho,
+                    profMin: profMin,
+                    profMax: profMax,
+                  )
+                : _Pool3dSvg.buildRectangular(
+                    largo: largo,
+                    ancho: ancho,
+                    profMin: profMin,
+                    profMax: profMax,
+                  );
+
+    final dimensionLabel = isCircular
+        ? 'Ø ${_fmt(diametro)} m × ${_fmt(profMed)} m'
+        : '${_fmt(largo)} m × ${_fmt(ancho)} m × ${_fmt(profMed)} m';
 
     return SizedBox(
       height: height,
@@ -42,12 +81,7 @@ class Pool3dPreview extends StatelessWidget {
           // ── SVG vectorial — sin pixelación ──────────────────────────────
           Positioned.fill(
             child: SvgPicture.string(
-              _Pool3dSvg.build(
-                largo: largo,
-                ancho: ancho,
-                profMin: profMin,
-                profMax: profMax,
-              ),
+              svg,
               fit: BoxFit.contain,
             ),
           ),
@@ -68,7 +102,7 @@ class Pool3dPreview extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  '${_fmt(largo)} m × ${_fmt(ancho)} m × ${_fmt(profMed)} m',
+                  dimensionLabel,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -127,7 +161,7 @@ class _Pool3dSvg {
 
   // ── Constructor principal ──────────────────────────────────────────────────
 
-  static String build({
+  static String buildRectangular({
     required double largo,
     required double ancho,
     required double profMin,
@@ -243,6 +277,127 @@ class _Pool3dSvg {
   <line x1="${_n(tbr.$1)}" y1="${_n(tbr.$2)}"
     x2="${_n(bbr.$1)}" y2="${_n(bbr.$2)}"
     stroke="#5598C0" stroke-opacity="0.80" stroke-width="1.3"/>
+</svg>''';
+  }
+
+  static String buildCircular({
+    required double diameter,
+    required double profMin,
+    required double profMax,
+  }) {
+    return _buildTopDownShape(
+      widthM: diameter,
+      heightM: diameter,
+      profMin: profMin,
+      profMax: profMax,
+      useRoundedRect: false,
+    );
+  }
+
+  static String buildOval({
+    required double largo,
+    required double ancho,
+    required double profMin,
+    required double profMax,
+  }) {
+    return _buildTopDownShape(
+      widthM: largo,
+      heightM: ancho,
+      profMin: profMin,
+      profMax: profMax,
+      useRoundedRect: false,
+    );
+  }
+
+  static String buildRoundedRect({
+    required double largo,
+    required double ancho,
+    required double profMin,
+    required double profMax,
+  }) {
+    return _buildTopDownShape(
+      widthM: largo,
+      heightM: ancho,
+      profMin: profMin,
+      profMax: profMax,
+      useRoundedRect: true,
+    );
+  }
+
+  static String _buildTopDownShape({
+    required double widthM,
+    required double heightM,
+    required double profMin,
+    required double profMax,
+    required bool useRoundedRect,
+  }) {
+    final maxDim = math.max(widthM, heightM);
+    final scale = ((_vw * 0.46) / maxDim.clamp(1.0, 30.0)).clamp(7.0, 30.0);
+
+    final shapeW = (widthM * scale).clamp(130.0, _vw * 0.72);
+    final shapeH = (heightM * scale).clamp(110.0, _vh * 0.50);
+    const cx = _vw / 2;
+    const cy = _vh * 0.44;
+    const deckPad = 12.0;
+    final outerW = shapeW + deckPad * 2;
+    final outerH = shapeH + deckPad * 2;
+    final shadowRx = (outerW * 0.42).clamp(48.0, 170.0);
+    final shadowRy = (outerH * 0.16).clamp(12.0, 42.0);
+    final shadowCx = cx + 6;
+    final shadowCy = cy + shapeH * 0.46 + 20;
+    final cornerRadius = math.min(shapeW, shapeH) * 0.18;
+    final innerRadius = useRoundedRect ? cornerRadius : 999.0;
+    final outerRadius = useRoundedRect ? cornerRadius + 12.0 : 999.0;
+
+    final outerShape = useRoundedRect
+        ? '<rect x="${_n(cx - outerW / 2)}" y="${_n(cy - outerH / 2)}" width="${_n(outerW)}" height="${_n(outerH)}" rx="${_n(outerRadius)}" ry="${_n(outerRadius)}" fill="#CBDFEE"/>'
+        : '<ellipse cx="${_n(cx)}" cy="${_n(cy)}" rx="${_n(outerW / 2)}" ry="${_n(outerH / 2)}" fill="#CBDFEE"/>';
+
+    final waterShape = useRoundedRect
+        ? '<rect x="${_n(cx - shapeW / 2)}" y="${_n(cy - shapeH / 2)}" width="${_n(shapeW)}" height="${_n(shapeH)}" rx="${_n(innerRadius)}" ry="${_n(innerRadius)}" fill="#79D9FF"/>'
+        : '<ellipse cx="${_n(cx)}" cy="${_n(cy)}" rx="${_n(shapeW / 2)}" ry="${_n(shapeH / 2)}" fill="#79D9FF"/>';
+
+    final highlightShape = useRoundedRect
+        ? '<rect x="${_n(cx - shapeW / 2)}" y="${_n(cy - shapeH / 2)}" width="${_n(shapeW)}" height="${_n(shapeH)}" rx="${_n(innerRadius)}" ry="${_n(innerRadius)}" fill="none" stroke="#7EC8F0" stroke-width="1.8" stroke-linejoin="round"/>'
+        : '<ellipse cx="${_n(cx)}" cy="${_n(cy)}" rx="${_n(shapeW / 2)}" ry="${_n(shapeH / 2)}" fill="none" stroke="#7EC8F0" stroke-width="1.8"/>';
+
+    final binaryLines = StringBuffer();
+    for (int i = 0; i < 7; i++) {
+      final t = (i + 1) / 8.0;
+      final lineY = cy - shapeH * 0.36 + (shapeH * 0.72 * t);
+      final lineInset = shapeW * 0.12;
+
+      binaryLines.writeln(
+        '<line x1="${_n(cx - shapeW / 2 + lineInset)}" y1="${_n(lineY)}" '
+        'x2="${_n(cx + shapeW / 2 - lineInset)}" y2="${_n(lineY + 2.4)}" '
+        'stroke="#000000" stroke-opacity="0.34" stroke-width="1.4" '
+        'stroke-linecap="round" filter="url(#softBlack)"/>'
+      );
+    }
+
+    return '''<svg viewBox="0 0 ${_n(_vw)} ${_n(_vh)}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="softBlack" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- Sombra suave bajo la alberca -->
+  <ellipse cx="${_n(shadowCx)}" cy="${_n(shadowCy)}" rx="${_n(shadowRx)}" ry="${_n(shadowRy)}" fill="#000000" fill-opacity="0.20"/>
+
+  <!-- Borde exterior / deck -->
+  $outerShape
+
+  <!-- Agua -->
+  $waterShape
+
+  <!-- Binarización / textura -->
+  <g>
+    ${binaryLines.toString().trim()}
+  </g>
+
+  <!-- Borde superior -->
+  $highlightShape
 </svg>''';
   }
 }

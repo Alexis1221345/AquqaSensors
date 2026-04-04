@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/device_permission_helper.dart';
-import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/sensor_provider.dart';
 import '../../../shared/providers/arduino_provider.dart';
+import '../../../shared/providers/pool_provider.dart';
 import '../../../shared/widgets/app_bottom_nav.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/app_drawer.dart';
@@ -21,46 +20,27 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  String? _poolId;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final user = context.read<AuthProvider>().currentUser;
-      if (user == null) return;
-      final pool = await _getFirstPool(user.id);
-      if (pool != null && mounted) {
-        setState(() => _poolId = pool);
-        final now = DateTime.now();
-        await context.read<SensorProvider>().loadHistoricalReadings(
-          poolId: pool,
-          from: DateTime(now.year, now.month, now.day),
-          to: now,
-        );
-      }
+      final poolId = context.read<PoolProvider>().activePoolId;
+      if (poolId == null || !mounted) return;
+      final now = DateTime.now();
+      await context.read<SensorProvider>().loadHistoricalReadings(
+        poolId: poolId,
+        from: now.subtract(const Duration(days: 7)),
+        to: now,
+      );
     });
-  }
-
-  Future<String?> _getFirstPool(String userId) async {
-    try {
-      final data = await Supabase.instance.client
-          .from(AppConstants.tablePools)
-          .select('id')
-          .eq('owner_id', userId)
-          .limit(1)
-          .maybeSingle();
-      return data?['id'] as String?;
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<void> _onPeriodChanged(
       String period, DateTime from, DateTime to) async {
-    if (_poolId == null) return;
+    final poolId = context.read<PoolProvider>().activePoolId;
+    if (poolId == null) return;
     await context.read<SensorProvider>().loadHistoricalReadings(
-      poolId: _poolId!,
+      poolId: poolId,
       from: from,
       to: to,
     );
@@ -87,7 +67,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _showWifiConnectionDialog() async {
-    if (_poolId == null) {
+    final poolId = context.read<PoolProvider>().activePoolId;
+    if (poolId == null) {
       _showSnack(context, 'conexión: primero registra una alberca');
       return;
     }
@@ -119,7 +100,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       context,
       suggestedSsid: currentSsid,
       onConnectByIp: (ip) => context.read<SensorProvider>().connectToEsp32(
-            poolId: _poolId!,
+            poolId: poolId,
             ip: ip.isNotEmpty ? ip : null,
           ),
       onProvision: ({
@@ -165,6 +146,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
       drawer: AppDrawer(
         onConnectWifi: _showWifiConnectionDialog,
         onConnectBluetooth: _showBluetoothConnectionDialog,
+        onPoolChanged: (poolId) async {
+          final now = DateTime.now();
+          await context.read<SensorProvider>().loadHistoricalReadings(
+            poolId: poolId,
+            from: now.subtract(const Duration(days: 7)),
+            to: now,
+          );
+        },
       ),
       appBar: AppHeader(
         title: 'Reportes',

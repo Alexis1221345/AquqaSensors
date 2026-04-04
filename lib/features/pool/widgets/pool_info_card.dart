@@ -49,6 +49,7 @@ class PoolInfoCard extends StatelessWidget {
                 diametroM: pool.diametroM,
                 profMinimaM: pool.profMinimaM,
                 profMaximaM: pool.profMaximaM,
+                tipo: pool.tipo,
               ),
             ),
 
@@ -104,12 +105,23 @@ class PoolInfoCard extends StatelessWidget {
   }
 
   String _dimensionsLabel(PoolModel pool) {
+    final isCircular = (pool.tipo ?? '').trim().toLowerCase() == 'circular';
     final largo = pool.largoM ?? pool.diametroM;
     final ancho = pool.anchoM ?? pool.diametroM;
+    final diametro = pool.diametroM ?? pool.largoM ?? pool.anchoM;
     final pMin = pool.profMinimaM;
     final pMax = pool.profMaximaM;
 
-    if (largo == null || ancho == null || pMin == null || pMax == null) {
+    if (pMin == null || pMax == null) {
+      return 'Medidas no disponibles';
+    }
+
+    if (isCircular) {
+      if (diametro == null) return 'Medidas no disponibles';
+      return 'Ø ${_fmt(diametro)}m x ${_fmt(pMin)}-${_fmt(pMax)}m';
+    }
+
+    if (largo == null || ancho == null) {
       return 'Medidas no disponibles';
     }
 

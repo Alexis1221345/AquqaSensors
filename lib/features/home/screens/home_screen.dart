@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/device_permission_helper.dart';
@@ -8,6 +7,7 @@ import '../../../core/utils/sensor_status_helper.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/sensor_provider.dart';
 import '../../../shared/providers/arduino_provider.dart';
+import '../../../shared/providers/pool_provider.dart';
 import '../../../shared/widgets/app_bottom_nav.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/app_drawer.dart';
@@ -23,40 +23,28 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String? _poolId;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final user = context.read<AuthProvider>().currentUser;
       if (user == null) return;
-      final pool = await _getFirstPool(user.id);
-      if (mounted) {
-        setState(() => _poolId = pool);
-        await context.read<SensorProvider>().loadLatestReadings(
-              pool ?? 'sin-alberca',
-            );
+      final poolProv = context.read<PoolProvider>();
+      if (!poolProv.hasPools) await poolProv.loadPools(user.id);
+      final poolId = poolProv.activePoolId;
+      if (mounted && poolId != null) {
+        await context.read<SensorProvider>().loadLatestReadings(poolId);
       }
     });
   }
 
-  Future<String?> _getFirstPool(String userId) async {
-    try {
-      final data = await Supabase.instance.client
-          .from(AppConstants.tablePools)
-          .select('id')
-          .eq('owner_id', userId)
-          .limit(1)
-          .maybeSingle();
-      return data?['id'] as String?;
-    } catch (_) {
-      return null;
-    }
+  Future<void> _onPoolChanged(String poolId) async {
+    await context.read<SensorProvider>().loadLatestReadings(poolId);
   }
 
   Future<void> _showWifiConnectionDialog() async {
-    if (_poolId == null) {
+    final poolId = context.read<PoolProvider>().activePoolId;
+    if (poolId == null) {
       _showInfoMessage('Primero registra una alberca para conectar el ESP32.');
       return;
     }
@@ -86,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       suggestedSsid: currentSsid,
       onConnectByIp: (ip) => context.read<SensorProvider>().connectToEsp32(
-            poolId: _poolId!,
+            poolId: poolId,
             ip: ip.isNotEmpty ? ip : null,
           ),
       onProvision: ({
@@ -137,6 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: AppDrawer(
         onConnectWifi: _showWifiConnectionDialog,
         onConnectBluetooth: _showBluetoothConnectionDialog,
+        onPoolChanged: _onPoolChanged,
       ),
       appBar: AppHeader(
         title: '¡Hola, ${user?.nombre ?? 'Usuario'}!',

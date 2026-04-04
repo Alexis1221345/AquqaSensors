@@ -2,20 +2,25 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/device_permission_helper.dart';
 import '../../../data/models/pool_model.dart';
+import '../../../data/models/pool_dashboard_model.dart';
 import '../../../data/supabase/supabase_storage_service.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/arduino_provider.dart';
+import '../../../shared/providers/pool_provider.dart';
+import '../../../shared/providers/pool_dashboard_provider.dart';
 import '../../../shared/widgets/app_bottom_nav.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/connection_dialogs.dart';
+import '../widgets/active_alerts_card.dart';
+import '../widgets/chemical_history_card.dart';
 import '../widgets/pool_3d_preview.dart';
+import '../widgets/recommended_doses_card.dart';
 import 'add_pool_sheet.dart';
 
 class PoolScreen extends StatefulWidget {
@@ -28,45 +33,33 @@ class PoolScreen extends StatefulWidget {
 class _PoolScreenState extends State<PoolScreen> {
   final _storageService = SupabaseStorageService();
   bool _uploadingImage = false;
-  bool _loadingPool = true;
-  PoolModel? _pool;
+
+  Future<void> _loadDashboardForActivePool() async {
+    final poolId = context.read<PoolProvider>().activePoolId;
+    final dashboardProv = context.read<PoolDashboardProvider>();
+    if (poolId == null) {
+      dashboardProv.clear();
+      return;
+    }
+    await dashboardProv.loadDashboard(poolId);
+  }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPool());
-  }
-
-  Future<void> _loadPool() async {
-    setState(() => _loadingPool = true);
-    final user = context.read<AuthProvider>().currentUser;
-    if (user == null) {
-      setState(() => _loadingPool = false);
-      return;
-    }
-    try {
-      final data = await Supabase.instance.client
-          .from(AppConstants.tablePools)
-          .select()
-          .eq('owner_id', user.id)
-          .limit(1)
-          .maybeSingle();
-
-      if (mounted) {
-        setState(() {
-          _pool = data != null
-              ? PoolModel.fromJson(data)
-              : null;
-          _loadingPool = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingPool = false);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = context.read<AuthProvider>().currentUser;
+      if (user == null) return;
+      final poolProv = context.read<PoolProvider>();
+      if (!poolProv.hasPools) await poolProv.loadPools(user.id);
+      if (!mounted) return;
+      await _loadDashboardForActivePool();
+    });
   }
 
   Future<void> _uploadImage() async {
-    if (_pool == null) return;
+    final pool = context.read<PoolProvider>().activePool;
+    if (pool == null) return;
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
@@ -78,14 +71,17 @@ class _PoolScreenState extends State<PoolScreen> {
     setState(() => _uploadingImage = true);
     try {
       await _storageService.uploadPoolImage(
-        poolId: _pool!.id,
+        poolId: pool.id,
         imageFile: File(picked.path),
       );
       if (mounted) {
+        final user = context.read<AuthProvider>().currentUser;
+        if (user != null) {
+          await context.read<PoolProvider>().loadPools(user.id);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Imagen subida correctamente.')),
         );
-        _loadPool();
       }
     } catch (e) {
       if (mounted) {
@@ -169,6 +165,8 @@ class _PoolScreenState extends State<PoolScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final poolProv = context.watch<PoolProvider>();
+    final pool = poolProv.activePool;
     final arduino = context.watch<ArduinoProvider>();
 
     return Scaffold(
@@ -176,6 +174,10 @@ class _PoolScreenState extends State<PoolScreen> {
       drawer: AppDrawer(
         onConnectWifi: _showWifiConnectionDialog,
         onConnectBluetooth: _showBluetoothConnectionDialog,
+        onPoolChanged: (poolId) async {
+          await context.read<PoolDashboardProvider>().loadDashboard(poolId);
+          if (mounted) setState(() {});
+        },
       ),
       appBar: AppHeader(
         title: 'Alberca',
@@ -185,13 +187,13 @@ class _PoolScreenState extends State<PoolScreen> {
       body: Stack(
         children: [
           const _PoolBlueprintBackground(),
-          if (_loadingPool)
+          if (poolProv.loading)
             const Center(
               child: CircularProgressIndicator(color: Colors.white),
             )
           else
             _PoolContent(
-              pool: _pool,
+              pool: pool,
               isUploadingImage: _uploadingImage,
               onAddPool: () => showModalBottomSheet(
                 context: context,
@@ -199,7 +201,16 @@ class _PoolScreenState extends State<PoolScreen> {
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                builder: (_) => AddPoolSheet(onSaved: _loadPool),
+                builder: (_) => AddPoolSheet(
+                  onSaved: () async {
+                    final user = context.read<AuthProvider>().currentUser;
+                    if (user != null) {
+                      await context.read<PoolProvider>().loadPools(user.id);
+                    }
+                    if (!mounted) return;
+                    await _loadDashboardForActivePool();
+                  },
+                ),
               ),
               onUploadPhoto: _uploadImage,
               statusCard: _Esp32StatusCard(
@@ -235,6 +246,7 @@ class _PoolContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dashboard = context.watch<PoolDashboardProvider>().dashboard;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 22),
       children: [
@@ -245,13 +257,42 @@ class _PoolContent extends StatelessWidget {
           diametroM: pool?.diametroM,
           profMinimaM: pool?.profMinimaM,
           profMaximaM: pool?.profMaximaM,
+          tipo: pool?.tipo,
           showDimensionBadge: true,
           height: 280,
         ),
         const SizedBox(height: 10),
         statusCard,
         const SizedBox(height: 12),
-        _PoolInfoGlassCard(pool: pool),
+        _PoolInfoGlassCard(pool: pool, dashboardPool: dashboard?.pool),
+        const SizedBox(height: 12),
+        Consumer<PoolDashboardProvider>(
+          builder: (context, dashProv, _) {
+            if (dashProv.loading) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              );
+            }
+
+            final dash = dashProv.dashboard;
+            if (dash == null) return const SizedBox.shrink();
+
+            return Column(
+              children: [
+                ActiveAlertsCard(alertas: dash.alertasActivas),
+                ChemicalHistoryCard(dosis: dash.dosisHistorial),
+                RecommendedDosesCard(
+                  dosis: dash.dosisRecomendadas,
+                  volumenLitros: dash.pool?.volumenLitros ?? pool?.volumenLitros,
+                ),
+                const SizedBox(height: 8),
+              ],
+            );
+          },
+        ),
         const SizedBox(height: 16),
         _PrimaryPoolActionButton(
           hasPool: pool != null,
@@ -324,8 +365,9 @@ class _PrimaryPoolActionButton extends StatelessWidget {
 
 class _PoolInfoGlassCard extends StatelessWidget {
   final PoolModel? pool;
+  final PoolDashboardPoolModel? dashboardPool;
 
-  const _PoolInfoGlassCard({required this.pool});
+  const _PoolInfoGlassCard({required this.pool, this.dashboardPool});
 
   @override
   Widget build(BuildContext context) {
@@ -342,14 +384,39 @@ class _PoolInfoGlassCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _infoRow('Nombre de ubicación', pool?.nombre ?? 'Sin alberca registrada'),
+          _infoRow(
+            'Nombre de ubicación',
+            dashboardPool?.nombre ?? pool?.nombre ?? 'Sin alberca registrada',
+          ),
+          const SizedBox(height: 8),
+          _infoRow(
+            'Tipo',
+            dashboardPool?.tipo ?? pool?.tipo ?? 'No especificado',
+          ),
+          const SizedBox(height: 8),
+          _infoRow(
+            'Volumen',
+            _volumeLabel(
+              dashboardPool?.volumenLitros ?? pool?.volumenLitros,
+            ),
+          ),
           const SizedBox(height: 8),
           _infoRow('Dimensiones', _dimensionsLabel(pool)),
           const SizedBox(height: 8),
-          _infoRow('Ubicación', pool?.ubicacion ?? 'No especificada'),
+          _infoRow(
+            'Ubicación',
+            dashboardPool?.ubicacion ?? pool?.ubicacion ?? 'No especificada',
+          ),
         ],
       ),
     );
+  }
+
+  String _volumeLabel(double? litros) {
+    if (litros == null) return 'No disponible';
+    if (litros >= 1000000) return '${(litros / 1000000).toStringAsFixed(2)} ML';
+    if (litros >= 1000) return '${(litros / 1000).toStringAsFixed(0)} m³';
+    return '${litros.toStringAsFixed(0)} L';
   }
 
   Widget _infoRow(String title, String value) {
@@ -384,12 +451,23 @@ class _PoolInfoGlassCard extends StatelessWidget {
 
   String _dimensionsLabel(PoolModel? pool) {
     if (pool == null) return 'Sin medidas';
+    final isCircular = (pool.tipo ?? '').trim().toLowerCase() == 'circular';
     final largo = pool.largoM ?? pool.diametroM;
     final ancho = pool.anchoM ?? pool.diametroM;
+    final diametro = pool.diametroM ?? pool.largoM ?? pool.anchoM;
     final pMin = pool.profMinimaM;
     final pMax = pool.profMaximaM;
 
-    if (largo == null || ancho == null || pMin == null || pMax == null) {
+    if (pMin == null || pMax == null) {
+      return 'Medidas no disponibles';
+    }
+
+    if (isCircular) {
+      if (diametro == null) return 'Medidas no disponibles';
+      return 'Ø ${_fmt(diametro)}m x ${_fmt((pMin + pMax) / 2)}m';
+    }
+
+    if (largo == null || ancho == null) {
       return 'Medidas no disponibles';
     }
 
