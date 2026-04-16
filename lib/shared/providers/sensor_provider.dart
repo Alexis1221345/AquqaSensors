@@ -3,6 +3,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/utils/sensor_status_helper.dart';
 import '../../data/supabase/supabase_sensor_service.dart';
 import '../../data/arduino/esp32_service.dart';
+import '../../services/realtime_service.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected, error }
 
@@ -22,6 +23,10 @@ class SensorProvider extends ChangeNotifier {
   List<double> cloroHistory = [];
   List<double> tempHistory = [];
   List<double> turbHistory = [];
+  List<double> alcalinidadHistory = [];
+
+  final List<Map<String, dynamic>> _realtimeAlerts = [];
+  final List<Map<String, dynamic>> _inventarioBajo = [];
 
   ConnectionStatus _connectionStatus = ConnectionStatus.disconnected;
   bool _isLoading = false;
@@ -31,6 +36,9 @@ class SensorProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isConnected => _connectionStatus == ConnectionStatus.connected;
+  List<Map<String, dynamic>> get realtimeAlerts => _realtimeAlerts;
+  List<Map<String, dynamic>> get inventarioBajo => _inventarioBajo;
+  bool get hasRealtimeAlerts => _realtimeAlerts.isNotEmpty;
 
   // ── Carga las últimas lecturas de Supabase ────────────────────
 
@@ -92,12 +100,18 @@ class SensorProvider extends ChangeNotifier {
           from: from, to: to,
           absMin: AppConstants.turbidezMin, absMax: AppConstants.turbidezAbsMax,
         ),
+        _supabase.getHistory(
+          table: AppConstants.tableReadingsAlcalinidad, poolId: poolId,
+          from: from, to: to,
+          absMin: AppConstants.alcalinidadAbsMin, absMax: AppConstants.alcalinidadAbsMax,
+        ),
       ]);
 
       phHistory    = results[0];
       cloroHistory = results[1];
       tempHistory  = results[2];
       turbHistory  = results[3];
+      alcalinidadHistory = results[4];
 
       notifyListeners();
     } catch (e) {
@@ -147,6 +161,73 @@ class SensorProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void startRealtime(String poolId, String poolNombre) {
+    _realtimeAlerts.clear();
+    _inventarioBajo.clear();
+
+    RealtimeService.instance.subscribeToPool(
+      poolId: poolId,
+      poolNombre: poolNombre,
+      onNewReading: (parametro, valor, status) {
+        switch (parametro) {
+          case 'ph':
+            ph = valor;
+            phHistory = _appendHistory(phHistory, valor);
+            break;
+          case 'cloro':
+            cloro = valor;
+            cloroHistory = _appendHistory(cloroHistory, valor);
+            break;
+          case 'temperatura':
+            temperatura = valor;
+            tempHistory = _appendHistory(tempHistory, valor);
+            break;
+          case 'turbidez':
+            turbidez = valor;
+            turbHistory = _appendHistory(turbHistory, valor);
+            break;
+          case 'alcalinidad':
+            alcalinidad = valor;
+            alcalinidadHistory = _appendHistory(alcalinidadHistory, valor);
+            break;
+        }
+        notifyListeners();
+      },
+      onNewAlert: (parametro, nivel, mensaje, valor) {
+        _realtimeAlerts.insert(0, {
+          'poolId': poolId,
+          'poolNombre': poolNombre,
+          'parametro': parametro,
+          'nivel': nivel,
+          'mensaje': mensaje,
+          'valor': valor,
+          'timestamp': DateTime.now(),
+        });
+        if (_realtimeAlerts.length > 20) {
+          _realtimeAlerts.removeLast();
+        }
+        notifyListeners();
+      },
+      onInventarioBajo: (quimicoNombre, pct) {
+        _inventarioBajo.insert(0, {
+          'poolId': poolId,
+          'poolNombre': poolNombre,
+          'quimicoNombre': quimicoNombre,
+          'pct': pct,
+          'timestamp': DateTime.now(),
+        });
+        if (_inventarioBajo.length > 20) {
+          _inventarioBajo.removeLast();
+        }
+        notifyListeners();
+      },
+    );
+  }
+
+  void stopRealtime() {
+    RealtimeService.instance.unsubscribeAll();
+  }
+
   void disconnect() {
     _connectionStatus = ConnectionStatus.disconnected;
     notifyListeners();
@@ -155,5 +236,13 @@ class SensorProvider extends ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  List<double> _appendHistory(List<double> history, double value) {
+    final next = List<double>.from(history)..add(value);
+    if (next.length > 12) {
+      return next.sublist(next.length - 12);
+    }
+    return next;
   }
 }

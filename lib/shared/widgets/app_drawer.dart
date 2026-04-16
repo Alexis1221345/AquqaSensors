@@ -25,7 +25,6 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
-
   void _handleDrawerAction(
     BuildContext context,
     Future<void> Function()? action,
@@ -42,6 +41,7 @@ class _AppDrawerState extends State<AppDrawer> {
   void _openAddPoolSheet(BuildContext context) {
     Navigator.pop(context);
     Future<void>.delayed(const Duration(milliseconds: 220), () {
+      if (!context.mounted) return;
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -50,10 +50,12 @@ class _AppDrawerState extends State<AppDrawer> {
         ),
         builder: (_) => AddPoolSheet(
           onSaved: () async {
+            if (!context.mounted) return;
             final userId = context.read<AuthProvider>().currentUser?.id;
             if (userId == null) return;
             final poolProvider = context.read<PoolProvider>();
             await poolProvider.loadPools(userId);
+            if (!context.mounted) return;
             if (poolProvider.pools.isNotEmpty) {
               poolProvider.setActivePool(poolProvider.pools.first);
             }
@@ -147,7 +149,8 @@ class _AppDrawerState extends State<AppDrawer> {
 
             // Mis Albercas
             Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data:
+                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 leading: const Icon(
                   Icons.pool_outlined,
@@ -220,7 +223,8 @@ class _AppDrawerState extends State<AppDrawer> {
                     onTap: () => _openAddPoolSheet(context),
                     borderRadius: BorderRadius.circular(10),
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       child: Row(
                         children: [
                           Icon(
@@ -245,8 +249,20 @@ class _AppDrawerState extends State<AppDrawer> {
               ),
             ),
 
+            _DrawerItem(
+              icon: Icons.science_outlined,
+              label: 'Mis Químicos',
+              enabled: poolProv.activePoolId != null,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, AppRouter.poolChemicals);
+              },
+            ),
+
+
             Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data:
+                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 leading: const Icon(
                   Icons.settings_input_component_outlined,
@@ -348,7 +364,8 @@ class _PoolItem extends StatelessWidget {
             Icon(
               Icons.pool,
               size: 16,
-              color: isActive ? AppColors.statusOptimo : AppColors.textSecondary,
+              color:
+                  isActive ? AppColors.statusOptimo : AppColors.textSecondary,
             ),
             const SizedBox(width: 10),
             Expanded(

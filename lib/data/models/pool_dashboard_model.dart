@@ -43,27 +43,24 @@ class ChemicalDoseHistoryModel {
   });
 
   String get cantidadLabel {
-    if (cantidadGramos != null && cantidadGramos! > 0) {
-      if (cantidadGramos! >= 1000) {
-        return '${(cantidadGramos! / 1000).toStringAsFixed(1)} kg';
-      }
-      return '${cantidadGramos!.toStringAsFixed(0)} g';
-    }
-    if (cantidadMl != null && cantidadMl! > 0) {
-      if (cantidadMl! >= 1000) {
-        return '${(cantidadMl! / 1000).toStringAsFixed(1)} L';
-      }
-      return '${cantidadMl!.toStringAsFixed(0)} ml';
-    }
-    return '—';
+    if (cantidadMl == null) return '—';
+    return '${cantidadMl!.toStringAsFixed(0)} ml';
   }
 
-  String get quimicoLabel => {
+  String get quimicoLabel =>
+      {
+        'cloro': 'Cloro',
         'tricloro': 'Tricloro',
         'cloro_choque': 'Cloro Choque',
         'algicida': 'Algicida',
         'subir_ph': 'Subir pH',
         'bajar_ph': 'Bajar pH',
+        'alcalinidad': 'Alcalinidad',
+        'turbidez': 'Floculante',
+        'alcalinidad_plus_liquido': 'Alcalinidad Plus',
+        'hipoclorito_sodio': 'Hipoclorito de sodio',
+        'acido_muriatico': 'Ácido muriático',
+        'soda_caustica': 'Soda cáustica',
         'floculante': 'Floculante',
         'antical': 'Antical',
       }[quimico] ??
@@ -100,21 +97,29 @@ class RecommendedDoseModel {
   });
 
   String get cantidadLabel {
-    if (unidad == 'g' && cantidad >= 1000) {
-      return '${(cantidad / 1000).toStringAsFixed(1)} kg';
-    }
     if (unidad == 'ml' && cantidad >= 1000) {
       return '${(cantidad / 1000).toStringAsFixed(1)} L';
     }
-    return '${cantidad.toStringAsFixed(1)} $unidad';
+    if (unidad == 'ml') {
+      return '${cantidad.toStringAsFixed(0)} ml';
+    }
+    return '${cantidad.toStringAsFixed(0)} ml';
   }
 
-  String get quimicoLabel => {
+  String get quimicoLabel =>
+      {
+        'cloro': 'Cloro',
         'tricloro': 'Tricloro',
         'cloro_choque': 'Cloro Choque',
         'algicida': 'Algicida',
         'subir_ph': 'Subir pH',
         'bajar_ph': 'Bajar pH',
+        'alcalinidad': 'Alcalinidad',
+        'turbidez': 'Floculante',
+        'alcalinidad_plus_liquido': 'Alcalinidad Plus',
+        'hipoclorito_sodio': 'Hipoclorito de sodio',
+        'acido_muriatico': 'Ácido muriático',
+        'soda_caustica': 'Soda cáustica',
         'floculante': 'Floculante',
         'antical': 'Antical',
       }[quimico] ??
@@ -193,8 +198,8 @@ class PoolDashboardModel {
                 ChemicalDoseHistoryModel.fromJson(e as Map<String, dynamic>))
             .toList(),
         dosisRecomendadas: ((json['dosis_recomendadas'] as List?) ?? const [])
-            .map((e) => RecommendedDoseModel.fromJson(e as Map<String, dynamic>))
+            .map(
+                (e) => RecommendedDoseModel.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }
-

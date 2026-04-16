@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../config/router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/device_permission_helper.dart';
@@ -30,12 +31,23 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = context.read<AuthProvider>().currentUser;
       if (user == null) return;
       final poolProv = context.read<PoolProvider>();
+      final sensorProv = context.read<SensorProvider>();
       if (!poolProv.hasPools) await poolProv.loadPools(user.id);
       final poolId = poolProv.activePoolId;
       if (mounted && poolId != null) {
-        await context.read<SensorProvider>().loadLatestReadings(poolId);
+        await sensorProv.loadLatestReadings(poolId);
+        final pool = poolProv.activePool;
+        if (pool != null) {
+          sensorProv.startRealtime(pool.id, pool.nombre);
+        }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    context.read<SensorProvider>().stopRealtime();
+    super.dispose();
   }
 
   Future<void> _onPoolChanged(String poolId) async {
@@ -155,96 +167,171 @@ class _HomeScreenState extends State<HomeScreen> {
     final turbNorm = SensorStatusHelper.normalizeForGauge(
         turbidez, AppConstants.turbidezMin, AppConstants.turbidezAbsMax);
 
-    return ListView(
+    final lastAlert = sensorProv.realtimeAlerts.isNotEmpty
+        ? sensorProv.realtimeAlerts.first
+        : null;
+
+    return Column(
       children: [
-        if (sinDatos)
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.blue),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Esperando datos del sensor. Conecta el ESP32 o espera la siguiente lectura.',
-                    style: TextStyle(fontSize: 12, color: Colors.blue),
+        if (lastAlert != null)
+          _RealtimeAlertBanner(
+            alert: lastAlert,
+            onViewAll: () => Navigator.pushNamed(context, AppRouter.pool),
+          ),
+        Expanded(
+          child: ListView(
+            children: [
+              if (sinDatos)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border:
+                        Border.all(color: Colors.blue.withValues(alpha: 0.2)),
                   ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Esperando datos del sensor. Conecta el ESP32 o espera la siguiente lectura.',
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              SensorCard(
+                title: 'Nivel de pH',
+                icon: Icons.science_outlined,
+                iconColor: AppColors.ph,
+                value: ph,
+                unit: '',
+                rangeLabel: sinDatos
+                    ? 'Sin datos aún'
+                    : 'Rango: ${AppConstants.phMin} – ${AppConstants.phMax}',
+                status: SensorStatusHelper.phStatus(ph),
+                gaugeNormalized: phNorm,
+                dailyValues: sensorProv.phHistory.isEmpty
+                    ? List.filled(12, 0.0)
+                    : sensorProv.phHistory,
+                dailyLabels: const ['0h', '6h', '12h', '18h'],
+              ),
+              SensorCard(
+                title: 'Nivel de Cloro',
+                icon: Icons.colorize_outlined,
+                iconColor: AppColors.cloro,
+                value: cloro,
+                unit: 'ppm',
+                rangeLabel: sinDatos
+                    ? 'Sin datos aún'
+                    : 'Rango: ${AppConstants.cloroMin} – ${AppConstants.cloroMax} ppm',
+                status: SensorStatusHelper.cloroStatus(cloro),
+                gaugeNormalized: cloroNorm,
+                dailyValues: sensorProv.cloroHistory.isEmpty
+                    ? List.filled(12, 0.0)
+                    : sensorProv.cloroHistory,
+                dailyLabels: const ['0h', '6h', '12h', '18h'],
+              ),
+              SensorCard(
+                title: 'Temperatura',
+                icon: Icons.device_thermostat,
+                iconColor: AppColors.temperatura,
+                value: temp,
+                unit: ' °C',
+                rangeLabel: sinDatos
+                    ? 'Sin datos aún'
+                    : 'Rango: ${AppConstants.tempMin} – ${AppConstants.tempMax} °C',
+                status: SensorStatusHelper.temperaturaStatus(temp),
+                gaugeNormalized: tempNorm,
+                dailyValues: sensorProv.tempHistory.isEmpty
+                    ? List.filled(12, 0.0)
+                    : sensorProv.tempHistory,
+                dailyLabels: const ['0h', '6h', '12h', '18h'],
+              ),
+              SensorCard(
+                title: 'Turbidez',
+                icon: Icons.water_outlined,
+                iconColor: AppColors.turbidez,
+                value: turbidez,
+                unit: ' NTU',
+                rangeLabel: sinDatos
+                    ? 'Sin datos aún'
+                    : 'Rango: 0 – ${AppConstants.turbidezMax} NTU',
+                status: SensorStatusHelper.turbidezStatus(turbidez),
+                gaugeNormalized: turbNorm,
+                dailyValues: sensorProv.turbHistory.isEmpty
+                    ? List.filled(12, 0.0)
+                    : sensorProv.turbHistory,
+                dailyLabels: const ['0h', '6h', '12h', '18h'],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RealtimeAlertBanner extends StatelessWidget {
+  final Map<String, dynamic> alert;
+  final VoidCallback onViewAll;
+
+  const _RealtimeAlertBanner({
+    required this.alert,
+    required this.onViewAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final nivel = (alert['nivel'] as String?) ?? 'alerta';
+    final mensaje = (alert['mensaje'] as String?) ?? 'Nueva alerta recibida';
+    final parametro = (alert['parametro'] as String?) ?? 'Parámetro';
+    final valor = alert['valor'] as num?;
+    final isCritical = nivel == 'critico';
+    final bgColor = isCritical
+        ? AppColors.statusCritico.withValues(alpha: 0.14)
+        : Colors.amber.withValues(alpha: 0.16);
+    final borderColor = isCritical ? AppColors.statusCritico : Colors.amber;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isCritical ? Icons.warning_amber_rounded : Icons.notifications_active,
+            color: borderColor,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  valor == null ? '$parametro: $mensaje' : '$parametro: ${valor.toDouble().toStringAsFixed(1)} — $mensaje',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                 ),
               ],
             ),
           ),
-        SensorCard(
-          title: 'Nivel de pH',
-          icon: Icons.science_outlined,
-          iconColor: AppColors.ph,
-          value: ph,
-          unit: '',
-          rangeLabel: sinDatos
-              ? 'Sin datos aún'
-              : 'Rango: ${AppConstants.phMin} – ${AppConstants.phMax}',
-          status: SensorStatusHelper.phStatus(ph),
-          gaugeNormalized: phNorm,
-          dailyValues: sensorProv.phHistory.isEmpty
-              ? List.filled(12, 0.0)
-              : sensorProv.phHistory,
-          dailyLabels: const ['0h', '6h', '12h', '18h'],
-        ),
-        SensorCard(
-          title: 'Nivel de Cloro',
-          icon: Icons.colorize_outlined,
-          iconColor: AppColors.cloro,
-          value: cloro,
-          unit: 'ppm',
-          rangeLabel: sinDatos
-              ? 'Sin datos aún'
-              : 'Rango: ${AppConstants.cloroMin} – ${AppConstants.cloroMax} ppm',
-          status: SensorStatusHelper.cloroStatus(cloro),
-          gaugeNormalized: cloroNorm,
-          dailyValues: sensorProv.cloroHistory.isEmpty
-              ? List.filled(12, 0.0)
-              : sensorProv.cloroHistory,
-          dailyLabels: const ['0h', '6h', '12h', '18h'],
-        ),
-        SensorCard(
-          title: 'Temperatura',
-          icon: Icons.device_thermostat,
-          iconColor: AppColors.temperatura,
-          value: temp,
-          unit: ' °C',
-          rangeLabel: sinDatos
-              ? 'Sin datos aún'
-              : 'Rango: ${AppConstants.tempMin} – ${AppConstants.tempMax} °C',
-          status: SensorStatusHelper.temperaturaStatus(temp),
-          gaugeNormalized: tempNorm,
-          dailyValues: sensorProv.tempHistory.isEmpty
-              ? List.filled(12, 0.0)
-              : sensorProv.tempHistory,
-          dailyLabels: const ['0h', '6h', '12h', '18h'],
-        ),
-        SensorCard(
-          title: 'Turbidez',
-          icon: Icons.water_outlined,
-          iconColor: AppColors.turbidez,
-          value: turbidez,
-          unit: ' NTU',
-          rangeLabel: sinDatos
-              ? 'Sin datos aún'
-              : 'Rango: 0 – ${AppConstants.turbidezMax} NTU',
-          status: SensorStatusHelper.turbidezStatus(turbidez),
-          gaugeNormalized: turbNorm,
-          dailyValues: sensorProv.turbHistory.isEmpty
-              ? List.filled(12, 0.0)
-              : sensorProv.turbHistory,
-          dailyLabels: const ['0h', '6h', '12h', '18h'],
-        ),
-        const SizedBox(height: 16),
-      ],
+          TextButton(
+            onPressed: onViewAll,
+            child: const Text('Ver todas'),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -343,7 +343,7 @@ class _Pool3dSvg {
     final outerH = shapeH + deckPad * 2;
     final shadowRx = (outerW * 0.42).clamp(48.0, 170.0);
     final shadowRy = (outerH * 0.16).clamp(12.0, 42.0);
-    final shadowCx = cx + 6;
+    const shadowCx = cx + 6;
     final shadowCy = cy + shapeH * 0.46 + 20;
     final cornerRadius = math.min(shapeW, shapeH) * 0.18;
     final innerRadius = useRoundedRect ? cornerRadius : 999.0;

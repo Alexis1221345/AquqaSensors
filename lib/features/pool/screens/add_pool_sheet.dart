@@ -189,7 +189,7 @@ class _AddPoolSheetState extends State<AddPoolSheet> {
                           children: [
                             Icon(Icons.add_photo_alternate_outlined,
                                 size: 36,
-                                color: AppColors.primary.withOpacity(0.5)),
+                                color: AppColors.primary.withValues(alpha: 0.5)),
                             const SizedBox(height: 8),
                             const Text(
                               'Toca para agregar foto',
@@ -349,7 +349,7 @@ class _AddPoolSheetState extends State<AddPoolSheet> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.06),
+                  color: AppColors.primary.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

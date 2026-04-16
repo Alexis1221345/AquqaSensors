@@ -47,9 +47,9 @@ class _GaugePainter extends CustomPainter {
 
     // Segmentos de color
     final segments = [
-      _Segment(AppColors.gaugeGood,    0.0, 0.45),
-      _Segment(AppColors.gaugeWarning, 0.45, 0.72),
-      _Segment(AppColors.gaugeDanger,  0.72, 1.0),
+      const _Segment(AppColors.gaugeGood,    0.0, 0.45),
+      const _Segment(AppColors.gaugeWarning, 0.45, 0.72),
+      const _Segment(AppColors.gaugeDanger,  0.72, 1.0),
     ];
 
     for (final seg in segments) {

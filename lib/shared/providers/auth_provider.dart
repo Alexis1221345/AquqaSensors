@@ -4,6 +4,7 @@ import '../../data/supabase/supabase_auth_service.dart';
 import '../../data/models/user_model.dart';
 import '../../config/supabase_config.dart';
 import '../../core/constants/app_constants.dart';
+import '../../services/session_policy_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   SupabaseAuthService? _authService;
@@ -18,8 +19,13 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _authService?.isLoggedIn ?? false;
+  bool get hasActiveSession => _service.currentUser != null;
 
-  Future<bool> signIn({required String email, required String password}) async {
+  Future<bool> signIn({
+    required String email,
+    required String password,
+    required bool rememberMe,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -30,10 +36,18 @@ class AuthProvider extends ChangeNotifier {
         if (response.user!.emailConfirmedAt == null) {
           _errorMessage = 'Debes confirmar tu correo antes de ingresar.';
           await _service.signOut();
+          await SessionPolicyService.instance.clearPolicy();
           return false;
         }
-        await _loadUserProfile(response.user!.id);
+        try {
+          await _loadUserProfile(response.user!.id);
+        } catch (_) {
+          _currentUser = _buildFallbackUserFromAuth(response.user!);
+        }
         _currentUser ??= _buildFallbackUserFromAuth(response.user!);
+        await SessionPolicyService.instance.saveLoginPolicy(
+          rememberMe: rememberMe,
+        );
         return true;
       }
       _errorMessage = 'Credenciales incorrectas.';
@@ -131,17 +145,21 @@ class AuthProvider extends ChangeNotifier {
       return;
     }
 
-    await _upsertProfile(
-      userId: authUser.id,
-      nombre: authUser.userMetadata?['nombre'] as String? ??
-          authUser.userMetadata?['full_name'] as String? ??
-          'Usuario',
-      apellido: authUser.userMetadata?['apellido'] as String? ??
-          authUser.userMetadata?['apellido_paterno'] as String? ??
-          '',
-      email: authUser.email ?? '',
-    );
-    await _loadUserProfile(authUser.id);
+    try {
+      await _upsertProfile(
+        userId: authUser.id,
+        nombre: authUser.userMetadata?['nombre'] as String? ??
+            authUser.userMetadata?['full_name'] as String? ??
+            'Usuario',
+        apellido: authUser.userMetadata?['apellido'] as String? ??
+            authUser.userMetadata?['apellido_paterno'] as String? ??
+            '',
+        email: authUser.email ?? '',
+      );
+      await _loadUserProfile(authUser.id);
+    } catch (_) {
+      _currentUser = _buildFallbackUserFromAuth(authUser);
+    }
     _currentUser ??= _buildFallbackUserFromAuth(authUser);
     notifyListeners();
   }
@@ -172,6 +190,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> signOut() async {
     await _service.signOut();
+    await SessionPolicyService.instance.clearPolicy();
     _currentUser = null;
     notifyListeners();
   }

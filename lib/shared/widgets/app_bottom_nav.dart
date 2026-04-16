@@ -17,8 +17,14 @@ class AppBottomNav extends StatelessWidget {
     _NavItem(
       icon: Icons.bar_chart_outlined,
       activeIcon: Icons.bar_chart,
-      label: 'Reportes',
+      label: 'Sensores',
       route: AppRouter.reports,
+    ),
+    _NavItem(
+      icon: Icons.science_outlined,
+      activeIcon: Icons.science,
+      label: 'Dosificación',
+      route: AppRouter.chemicalsReport,
     ),
     _NavItem(
       icon: Icons.pool_outlined,

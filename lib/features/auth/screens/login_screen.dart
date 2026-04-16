@@ -4,7 +4,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../config/router.dart';
 import '../../../shared/providers/auth_provider.dart';
-import '../../../shared/providers/pool_provider.dart';
 import '../widgets/auth_form_field.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController(text: '1234');
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
+  bool _rememberForWeek = false;
 
   @override
   void dispose() {
@@ -34,14 +34,12 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await auth.signIn(
       email: _emailController.text.trim(),
       password: _passwordController.text,
+      rememberMe: _rememberForWeek,
     );
 
     if (!mounted) return;
     if (success) {
-      final userId = context.read<AuthProvider>().currentUser?.id;
-      if (userId != null) {
-        await context.read<PoolProvider>().loadPools(userId);
-      }
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRouter.home);
     } else if (auth.errorMessage != null) {
       _showError(auth.errorMessage!);
@@ -155,10 +153,35 @@ class _LoginScreenState extends State<LoginScreen> {
                                 () => _obscurePassword = !_obscurePassword),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return 'Ingresa tu contraseña';
+                        }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: CheckboxListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 8),
+                        value: _rememberForWeek,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text(
+                          'Mantener inicio de sesión por 7 días',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          setState(() => _rememberForWeek = value ?? false);
+                        },
+                      ),
                     ),
                     const SizedBox(height: 24),
 

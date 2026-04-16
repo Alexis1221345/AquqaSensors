@@ -10,6 +10,7 @@ import '../../../shared/widgets/app_bottom_nav.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/connection_dialogs.dart';
+import '../widgets/period_selector.dart';
 import '../widgets/report_chart_card.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -20,6 +21,8 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
+  String _currentPeriod = 'dia';
+
   @override
   void initState() {
     super.initState();
@@ -29,7 +32,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final now = DateTime.now();
       await context.read<SensorProvider>().loadHistoricalReadings(
         poolId: poolId,
-        from: now.subtract(const Duration(days: 7)),
+        from: DateTime(now.year, now.month, now.day),
         to: now,
       );
     });
@@ -37,6 +40,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _onPeriodChanged(
       String period, DateTime from, DateTime to) async {
+    setState(() => _currentPeriod = period);
     final poolId = context.read<PoolProvider>().activePoolId;
     if (poolId == null) return;
     await context.read<SensorProvider>().loadHistoricalReadings(
@@ -44,6 +48,47 @@ class _ReportsScreenState extends State<ReportsScreen> {
       from: from,
       to: to,
     );
+  }
+
+  DateTime _periodFrom(String period, DateTime now) {
+    return switch (period) {
+      'dia' => DateTime(now.year, now.month, now.day),
+      'semana' => now.subtract(const Duration(days: 7)),
+      'quincenal' => now.subtract(const Duration(days: 15)),
+      'mensual' => now.subtract(const Duration(days: 30)),
+      _ => now.subtract(const Duration(days: 7)),
+    };
+  }
+
+  List<String> _buildLabels(String period, int count) {
+    if (count == 0) return [];
+
+    const maxLabels = 5;
+    String labelForIndex(int idx) {
+      if (period == 'dia') {
+        final hour = (idx * 24 / count).round();
+        return '${hour}h';
+      }
+
+      final daysBack = switch (period) {
+        'semana' => 7,
+        'quincenal' => 15,
+        _ => 30,
+      };
+      final dayOffset = ((count - 1 - idx) * daysBack / count).round();
+      final date = DateTime.now().subtract(Duration(days: dayOffset));
+      return '${date.day}/${date.month}';
+    }
+
+    if (count <= maxLabels) {
+      return List.generate(count, labelForIndex);
+    }
+
+    final step = (count / (maxLabels - 1)).floor();
+    return List.generate(maxLabels, (i) {
+      final idx = i == maxLabels - 1 ? count - 1 : i * step;
+      return labelForIndex(idx);
+    });
   }
 
   double _avg(List<double> vals, double absMin, double absMax) {
@@ -150,18 +195,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
           final now = DateTime.now();
           await context.read<SensorProvider>().loadHistoricalReadings(
             poolId: poolId,
-            from: now.subtract(const Duration(days: 7)),
+            from: _periodFrom(_currentPeriod, now),
             to: now,
           );
         },
       ),
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Reportes',
         subtitle: 'Descarga tus datos históricos',
-        actions: const [MenuIconButton()],
+        actions: [MenuIconButton()],
       ),
       body: ListView(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: PeriodSelector(
+              selected: _currentPeriod,
+              onChanged: (period) async {
+                final poolId = context.read<PoolProvider>().activePoolId;
+                if (poolId == null) return;
+                final now = DateTime.now();
+                await _onPeriodChanged(period, _periodFrom(period, now), now);
+              },
+            ),
+          ),
           ReportChartCard(
             title: 'pH',
             rangeLabel: 'Rango: ${AppConstants.phMin} – ${AppConstants.phMax}',
@@ -171,8 +228,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             minimo: _min(phVals, AppConstants.phAbsMin, AppConstants.phAbsMax),
             maximo: _max(phVals, AppConstants.phAbsMin, AppConstants.phAbsMax),
             chartValues: phVals.isEmpty ? List.filled(12, 0.0) : phVals,
-            chartLabels: const ['0h', '6h', '12h', '18h'],
-            onPeriodChanged: _onPeriodChanged,
+            chartLabels: _buildLabels(_currentPeriod, phVals.length),
+            selectedPeriod: _currentPeriod,
             onDownload: () => _showSnack(context, 'pH'),
           ),
           ReportChartCard(
@@ -184,8 +241,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             minimo: _min(clVals, AppConstants.cloroAbsMin, AppConstants.cloroAbsMax),
             maximo: _max(clVals, AppConstants.cloroAbsMin, AppConstants.cloroAbsMax),
             chartValues: clVals.isEmpty ? List.filled(12, 0.0) : clVals,
-            chartLabels: const ['0h', '6h', '12h', '18h'],
-            onPeriodChanged: _onPeriodChanged,
+            chartLabels: _buildLabels(_currentPeriod, clVals.length),
+            selectedPeriod: _currentPeriod,
             onDownload: () => _showSnack(context, 'Cloro'),
           ),
           ReportChartCard(
@@ -197,8 +254,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             minimo: _min(tmpVals, AppConstants.tempAbsMin, AppConstants.tempAbsMax),
             maximo: _max(tmpVals, AppConstants.tempAbsMin, AppConstants.tempAbsMax),
             chartValues: tmpVals.isEmpty ? List.filled(12, 0.0) : tmpVals,
-            chartLabels: const ['0h', '6h', '12h', '18h'],
-            onPeriodChanged: _onPeriodChanged,
+            chartLabels: _buildLabels(_currentPeriod, tmpVals.length),
+            selectedPeriod: _currentPeriod,
             onDownload: () => _showSnack(context, 'Temperatura'),
           ),
           ReportChartCard(
@@ -210,8 +267,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             minimo: _min(turbVals, AppConstants.turbidezMin, AppConstants.turbidezAbsMax),
             maximo: _max(turbVals, AppConstants.turbidezMin, AppConstants.turbidezAbsMax),
             chartValues: turbVals.isEmpty ? List.filled(12, 0.0) : turbVals,
-            chartLabels: const ['0h', '6h', '12h', '18h'],
-            onPeriodChanged: _onPeriodChanged,
+            chartLabels: _buildLabels(_currentPeriod, turbVals.length),
+            selectedPeriod: _currentPeriod,
             onDownload: () => _showSnack(context, 'Turbidez'),
           ),
           const SizedBox(height: 16),

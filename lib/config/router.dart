@@ -8,6 +8,8 @@ import '../features/reports/screens/reports_screen.dart';
 import '../features/account/screens/account_screen.dart';
 import '../features/account/screens/edit_profile_screen.dart';
 import '../features/pool/screens/pool_screen.dart';
+import '../features/pool/screens/pool_chemicals_screen.dart';
+import '../features/pool/screens/chemicals_report_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -20,6 +22,8 @@ class AppRouter {
   static const String account = AppConstants.routeAccount;
   static const String editProfile = AppConstants.routeEditProfile;
   static const String pool = AppConstants.routePool;
+  static const String poolChemicals = AppConstants.routePoolChemicals;
+  static const String chemicalsReport = AppConstants.routeChemicalsReport;
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -28,7 +32,8 @@ class AppRouter {
       case register:
         return _fadeRoute(const RegisterScreen(), settings);
       case verifyEmail:
-        final email = settings.arguments is String ? settings.arguments as String : null;
+        final email =
+            settings.arguments is String ? settings.arguments as String : null;
         return _fadeRoute(EmailVerificationScreen(email: email), settings);
       case home:
         return _fadeRoute(const HomeScreen(), settings);
@@ -40,6 +45,10 @@ class AppRouter {
         return _slideRoute(const EditProfileScreen(), settings);
       case pool:
         return _fadeRoute(const PoolScreen(), settings);
+      case poolChemicals:
+        return _fadeRoute(const PoolChemicalsScreen(), settings);
+      case chemicalsReport:
+        return _fadeRoute(const ChemicalsReportScreen(), settings);
       default:
         return _fadeRoute(const LoginScreen(), settings);
     }

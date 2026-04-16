@@ -1,4 +1,3 @@
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/sensor_status_helper.dart';
 import '../../data/arduino/esp32_service.dart';
 import '../../data/supabase/supabase_sensor_service.dart';

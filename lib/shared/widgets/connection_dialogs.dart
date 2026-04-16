@@ -122,7 +122,7 @@ class _WifiConnectionDialogState extends State<_WifiConnectionDialog> {
           const SizedBox(height: 12),
           TextField(
             controller: _ipController,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: 'IP del ESP32',
               hintText: AppConstants.esp32DefaultIp,

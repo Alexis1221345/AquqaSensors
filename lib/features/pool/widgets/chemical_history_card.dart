@@ -19,10 +19,10 @@ class ChemicalHistoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
             child: Row(
-              children: const [
+              children: [
                 Icon(Icons.science_outlined, size: 16, color: AppColors.primary),
                 SizedBox(width: 8),
                 Text(

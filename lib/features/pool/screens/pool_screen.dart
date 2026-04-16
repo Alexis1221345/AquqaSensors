@@ -60,6 +60,9 @@ class _PoolScreenState extends State<PoolScreen> {
   Future<void> _uploadImage() async {
     final pool = context.read<PoolProvider>().activePool;
     if (pool == null) return;
+    final poolProv = context.read<PoolProvider>();
+    final authProv = context.read<AuthProvider>();
+    final messenger = ScaffoldMessenger.of(context);
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
@@ -74,18 +77,17 @@ class _PoolScreenState extends State<PoolScreen> {
         poolId: pool.id,
         imageFile: File(picked.path),
       );
-      if (mounted) {
-        final user = context.read<AuthProvider>().currentUser;
-        if (user != null) {
-          await context.read<PoolProvider>().loadPools(user.id);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Imagen subida correctamente.')),
-        );
+      if (!mounted) return;
+      final user = authProv.currentUser;
+      if (user != null) {
+        await poolProv.loadPools(user.id);
       }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Imagen subida correctamente.')),
+      );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Error al subir imagen: $e'),
             backgroundColor: AppColors.statusCritico,
@@ -179,10 +181,10 @@ class _PoolScreenState extends State<PoolScreen> {
           if (mounted) setState(() {});
         },
       ),
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Alberca',
         subtitle: 'Gestión y monitoreo',
-        actions: const [MenuIconButton()],
+        actions: [MenuIconButton()],
       ),
       body: Stack(
         children: [
@@ -224,7 +226,7 @@ class _PoolScreenState extends State<PoolScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 2),
+      bottomNavigationBar: const AppBottomNav(currentIndex: 3),
     );
   }
 }
@@ -512,16 +514,16 @@ class _PoolBlueprintBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(
+        const Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFF0C3E66),
-                  const Color(0xFF0B2D4A),
-                  const Color(0xFF102238),
+                  Color(0xFF0C3E66),
+                  Color(0xFF0B2D4A),
+                  Color(0xFF102238),
                 ],
               ),
             ),

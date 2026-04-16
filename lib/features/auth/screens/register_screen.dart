@@ -161,7 +161,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : null,
               ),
               const SizedBox(height: 14),
-              Text('FECHA DE NACIMIENTO', style: AppTextStyles.labelField),
+              const Text('FECHA DE NACIMIENTO', style: AppTextStyles.labelField),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _fechaNacimientoController,

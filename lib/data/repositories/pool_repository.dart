@@ -28,7 +28,7 @@ class PoolRepository {
         .maybeSingle();
 
     if (data == null) return null;
-    return PoolModel.fromJson(data as Map<String, dynamic>);
+    return PoolModel.fromJson(data);
   }
 
   Future<String> uploadImage({

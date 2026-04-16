@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_text_styles.dart';
 import '../../../data/supabase/supabase_storage_service.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/widgets/app_header.dart';
@@ -135,10 +134,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Editar Perfil',
         showBack: true,
-        actions: const [MenuIconButton()],
+        actions: [MenuIconButton()],
       ),
       body: Form(
         key: _formKey,
@@ -243,7 +242,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 2),
+      bottomNavigationBar: const AppBottomNav(currentIndex: 3),
     );
   }
 
