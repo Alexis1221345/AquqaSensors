@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../config/router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../config/router.dart';
+import '../../../features/home/screens/home_screen.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../widgets/auth_form_field.dart';
 
@@ -40,7 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     if (success) {
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRouter.home);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (_) => false,
+      );
     } else if (auth.errorMessage != null) {
       _showError(auth.errorMessage!);
       auth.clearError();
@@ -94,19 +98,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 Container(
                   width: 44,
                   height: 44,
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.water_drop,
-                      color: Colors.white, size: 24),
+                  child: Image.asset(
+                    'assets/images/Logo.jpg',
+                    fit: BoxFit.contain,
+                  ),
                 ),
                 const SizedBox(width: 12),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  children: const [
                     Text('AquaSensors', style: AppTextStyles.headerTitle),
-                    Text('CONTROL WATER QUALITY',
+                    Text('CONTROL DE CALIDAD DEL AGUA',
                         style: AppTextStyles.headerSubtitle),
                   ],
                 ),

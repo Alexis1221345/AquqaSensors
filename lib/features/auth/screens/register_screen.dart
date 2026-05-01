@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
 import '../../../config/router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../features/home/screens/home_screen.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../widgets/auth_form_field.dart';
 
@@ -108,7 +108,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     await auth.handleAuthSessionUpdate();
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, AppRouter.home);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (_) => false,
+    );
   }
 
   void _showError(String msg) {

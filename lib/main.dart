@@ -15,9 +15,6 @@ import 'services/session_policy_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SupabaseConfig.initialize();
-  await NotificationService.instance.initialize();
-  await NotificationService.instance.requestPermissions();
   runApp(const AquaSensorsApp());
 }
 
@@ -45,6 +42,22 @@ class AquaSensorsApp extends StatelessWidget {
   }
 }
 
+class _LoadingSplash extends StatelessWidget {
+  const _LoadingSplash();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SizedBox.expand(
+        child: Image(
+          image: AssetImage('assets/Pantalla/pantalla_carga.png'),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+}
+
 class _SessionGate extends StatefulWidget {
   const _SessionGate();
 
@@ -58,7 +71,19 @@ class _SessionGateState extends State<_SessionGate> {
   @override
   void initState() {
     super.initState();
-    _resolveSession();
+    _bootstrapApp();
+  }
+
+  Future<void> _bootstrapApp() async {
+    try {
+      await SupabaseConfig.initialize();
+      await NotificationService.instance.initialize();
+      await NotificationService.instance.requestPermissions();
+      await _resolveSession();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _allowAutoLogin = false);
+    }
   }
 
   Future<void> _resolveSession() async {
@@ -100,9 +125,7 @@ class _SessionGateState extends State<_SessionGate> {
   @override
   Widget build(BuildContext context) {
     if (_allowAutoLogin == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const _LoadingSplash();
     }
 
     if (_allowAutoLogin == true) {

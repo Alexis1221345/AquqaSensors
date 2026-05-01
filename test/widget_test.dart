@@ -26,6 +26,7 @@ void main() {
 
     // Verifica que los elementos del login estén presentes
     expect(find.text('AquaSensors'), findsOneWidget);
+    expect(find.text('CONTROL DE CALIDAD DEL AGUA'), findsOneWidget);
     expect(find.text('Iniciar Sesión'), findsOneWidget);
     expect(find.text('Crear cuenta'), findsOneWidget);
     expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
