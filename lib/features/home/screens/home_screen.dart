@@ -66,14 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final arduino = context.read<ArduinoProvider>();
-    if (!arduino.hasBluetoothSetup) {
-      _showInfoMessage(
-        'Primero configura el ESP32 por Bluetooth y despues enlaza la red Wi-Fi local.',
-      );
-      await _showBluetoothConnectionDialog();
-      return;
-    }
-
     final hasPermission = await DevicePermissionHelper.requestWifiAccess();
     if (!mounted) return;
     if (!hasPermission) {
