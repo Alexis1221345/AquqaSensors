@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'config/router.dart';
 import 'config/supabase_config.dart';
@@ -37,6 +38,89 @@ class AquaSensorsApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         home: const _SessionGate(),
         onGenerateRoute: AppRouter.generateRoute,
+        // Use builder to add a debug overlay in debug mode that helps
+        // inspect device pixels, DPR and tap coordinates.
+        builder: (context, child) {
+          return Stack(
+            children: [
+              if (child != null) child,
+              if (kDebugMode) const DebugPixelInspector(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// Debug-only widget that displays device pixel information and last tap
+// coordinates (logical and physical). It only shows in debug builds.
+class DebugPixelInspector extends StatefulWidget {
+  const DebugPixelInspector({super.key});
+
+  @override
+  State<DebugPixelInspector> createState() => _DebugPixelInspectorState();
+}
+
+class _DebugPixelInspectorState extends State<DebugPixelInspector> {
+  Offset? _lastTapLogical;
+  Offset? _lastTapPhysical;
+
+  void _handlePointerDown(PointerDownEvent event) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    setState(() {
+      _lastTapLogical = event.localPosition;
+      _lastTapPhysical = event.localPosition * dpr;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final dpr = mq.devicePixelRatio;
+    final logicalSize = mq.size;
+    final physicalSize = logicalSize * dpr;
+
+    return Positioned.fill(
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: _handlePointerDown,
+        child: SafeArea(
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 320),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white24),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: DefaultTextStyle(
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('DEBUG PIXEL INSPECTOR'),
+                      const SizedBox(height: 6),
+                      Text('DevicePixelRatio: ${dpr.toStringAsFixed(2)}'),
+                      Text('Logical size: ${logicalSize.width.toStringAsFixed(0)} x ${logicalSize.height.toStringAsFixed(0)}'),
+                      Text('Physical size: ${physicalSize.width.toStringAsFixed(0)} x ${physicalSize.height.toStringAsFixed(0)}'),
+                      const SizedBox(height: 6),
+                      Text('Last tap (logical): ${_lastTapLogical != null ? '${_lastTapLogical!.dx.toStringAsFixed(1)}, ${_lastTapLogical!.dy.toStringAsFixed(1)}' : '-'}'),
+                      Text('Last tap (physical): ${_lastTapPhysical != null ? '${_lastTapPhysical!.dx.toStringAsFixed(1)}, ${_lastTapPhysical!.dy.toStringAsFixed(1)}' : '-'}'),
+                      const SizedBox(height: 6),
+                      const Text('Tip: toca cualquier lugar para ver coordenadas'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
