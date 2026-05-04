@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/sensor_status_helper.dart';
 import '../../data/supabase/supabase_sensor_service.dart';
@@ -31,6 +32,10 @@ class SensorProvider extends ChangeNotifier {
   ConnectionStatus _connectionStatus = ConnectionStatus.disconnected;
   bool _isLoading = false;
   String? _errorMessage;
+  Timer? _renderStatusTimer;
+  bool _renderStatusRunning = false;
+  String? modoRender;
+  bool? bombasRender;
 
   ConnectionStatus get connectionStatus => _connectionStatus;
   bool get isLoading => _isLoading;
@@ -39,6 +44,7 @@ class SensorProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get realtimeAlerts => _realtimeAlerts;
   List<Map<String, dynamic>> get inventarioBajo => _inventarioBajo;
   bool get hasRealtimeAlerts => _realtimeAlerts.isNotEmpty;
+  bool get isRenderSyncActive => _renderStatusRunning;
 
   // ── Carga las últimas lecturas de Supabase ────────────────────
 
@@ -224,8 +230,44 @@ class SensorProvider extends ChangeNotifier {
     );
   }
 
+  Future<void> startRenderStatusSync() async {
+    if (_renderStatusRunning) return;
+    _renderStatusRunning = true;
+
+    await _syncRenderStatus();
+
+    _renderStatusTimer?.cancel();
+    _renderStatusTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _syncRenderStatus(),
+    );
+
+    notifyListeners();
+  }
+
+  Future<void> _syncRenderStatus() async {
+    final status = await _esp32.fetchRenderStatus();
+    if (status == null) return;
+
+    final nextModo = (status['modo'] as String?)?.trim();
+    final nextBombas = status['bombas'] as bool?;
+
+    if (nextModo != null && nextModo.isNotEmpty) {
+      modoRender = nextModo;
+    }
+    bombasRender = nextBombas;
+
+    notifyListeners();
+  }
+
   void stopRealtime() {
     RealtimeService.instance.unsubscribeAll();
+  }
+
+  void stopRenderStatusSync() {
+    _renderStatusTimer?.cancel();
+    _renderStatusTimer = null;
+    _renderStatusRunning = false;
   }
 
   void disconnect() {
@@ -236,6 +278,12 @@ class SensorProvider extends ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _renderStatusTimer?.cancel();
+    super.dispose();
   }
 
   List<double> _appendHistory(List<double> history, double value) {

@@ -15,6 +15,8 @@ import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/connection_dialogs.dart';
 import '../../../shared/widgets/loading_widget.dart';
 import '../widgets/sensor_card.dart';
+import '../widgets/connection_status_card.dart';
+import '../widgets/wifi_provisioning_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final pool = poolProv.activePool;
         if (pool != null) {
           sensorProv.startRealtime(pool.id, pool.nombre);
+          sensorProv.startRenderStatusSync();
         }
       }
     });
@@ -47,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     context.read<SensorProvider>().stopRealtime();
+    context.read<SensorProvider>().stopRenderStatusSync();
     super.dispose();
   }
 
@@ -121,6 +125,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _showAutoWifiProvisioningDialog() async {
+    final arduino = context.read<ArduinoProvider>();
+    final currentIp = await arduino.getCurrentWifiIp();
+
+    if (!mounted) return;
+
+    if (!arduino.isConnected) {
+      _showInfoMessage(
+        'Primero conecta el ESP32 por Bluetooth o WiFi para poder configurar la red.',
+      );
+      return;
+    }
+
+    final hasPermission = await DevicePermissionHelper.requestWifiAccess();
+    if (!mounted) return;
+    if (!hasPermission) {
+      _showInfoMessage(
+        'Se necesita permiso de ubicación o WiFi para acceder a la red actual.',
+      );
+      return;
+    }
+
+    await showWifiProvisioningDialog(
+      context,
+      esp32Ip: arduino.currentIp.isNotEmpty
+          ? arduino.currentIp
+          : (currentIp ?? '192.168.1.100'),
+    );
+  }
+
   void _showInfoMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -157,6 +191,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final temp = sensorProv.temperatura ?? 0.0;
     final turbidez = sensorProv.turbidez ?? 0.0;
     final sinDatos = sensorProv.ph == null;
+    final modoRender = sensorProv.modoRender;
+    final bombasRender = sensorProv.bombasRender;
 
     final phNorm = SensorStatusHelper.normalizeForGauge(
         ph, AppConstants.phAbsMin, AppConstants.phAbsMax);
@@ -173,11 +209,48 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Column(
       children: [
+        if (modoRender != null)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bombasRender == true
+                  ? Colors.orange.withValues(alpha: 0.14)
+                  : Colors.green.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (bombasRender == true ? Colors.orange : Colors.green)
+                    .withValues(alpha: 0.35),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  bombasRender == true ? Icons.water_drop : Icons.wb_sunny,
+                  color: bombasRender == true ? Colors.orange : Colors.green,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Render sincronizado: ${modoRender.toUpperCase()} · Bombas ${bombasRender == true ? 'ON' : 'OFF'}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (lastAlert != null)
           _RealtimeAlertBanner(
             alert: lastAlert,
             onViewAll: () => Navigator.pushNamed(context, AppRouter.pool),
           ),
+        // ConnectionStatusCard con opciones de auto-conexión
+        ConnectionStatusCard(
+          showProximityIndicator: true,
+          showAutoConnectToggle: true,
+          onAutoProvisionTap: _showAutoWifiProvisioningDialog,
+        ),
         Expanded(
           child: ListView(
             children: [

@@ -64,6 +64,8 @@ class AppConstants {
   static const String esp32EndpointReadings = '/sensors';
   static const String esp32EndpointStatus = '/status';
   static const String esp32EndpointProvisionWifi = '/provision-wifi';
+  static const String renderBaseUrl = 'https://simulacionaquasensors.onrender.com';
+  static const String renderEsp32StatusEndpoint = '/api/esp32/status';
   static const String esp32BleServiceUuid =
       '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
   static const String esp32BleCharUuid = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';

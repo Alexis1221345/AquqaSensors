@@ -62,4 +62,20 @@ class Esp32Service {
       return false;
     }
   }
+
+  /// Lee el estado del simulador en Render para sincronizar app y ESP32.
+  Future<Map<String, dynamic>?> fetchRenderStatus() async {
+    try {
+      final uri = Uri.parse(
+        '${AppConstants.renderBaseUrl}${AppConstants.renderEsp32StatusEndpoint}',
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return json;
+    } catch (_) {
+      return null;
+    }
+  }
 }
