@@ -74,12 +74,12 @@ class _WifiProvisioningDialogState extends State<WifiProvisioningDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final arduinoProvider =
-          context.read<ArduinoProvider>();
+      final arduinoProvider = context.read<ArduinoProvider>();
 
-      final success = await arduinoProvider.provisionEsp32Wifi(
+      // Intentamos provisioning inteligente: probar la IP proporcionada
+      // y, si no responde, probar el SoftAP por defecto 192.168.4.1.
+      final success = await arduinoProvider.autoProvisionWithCurrentNetwork(
         esp32Ip: widget.esp32Ip,
-        ssid: _detectedSsid!,
         password: _passwordController.text,
       );
 

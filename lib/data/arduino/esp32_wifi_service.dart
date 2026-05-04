@@ -99,11 +99,21 @@ class Esp32WifiService {
       final ssid = await getCurrentSsid();
       if (ssid == null || ssid.isEmpty) return false;
 
-      return await provisionWifiCredentials(
-        esp32Ip: esp32Ip,
-        ssid: ssid,
-        password: password,
-      );
+      // Si no se conoce la IP del ESP32, muchos sketches exponen un SoftAP
+      // por defecto en 192.168.4.1. Intentamos usar eso como fallback.
+      final List<String> candidates = [];
+      if (esp32Ip.isNotEmpty) candidates.add(esp32Ip);
+      candidates.add('192.168.4.1'); // ESP32 softAP por defecto
+
+      for (final ip in candidates) {
+        final ok = await provisionWifiCredentials(
+          esp32Ip: ip,
+          ssid: ssid,
+          password: password,
+        );
+        if (ok) return true;
+      }
+      return false;
     } catch (_) {
       return false;
     }
