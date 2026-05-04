@@ -259,49 +259,42 @@ class _AppDrawerState extends State<AppDrawer> {
               },
             ),
 
+            _DrawerItem(
+              icon: Icons.settings_input_component_outlined,
+              label: 'Conectar dispositivo',
+              enabled:
+                  widget.onConnectWifi != null || widget.onConnectBluetooth != null,
+              onTap: () async {
+                Navigator.pop(context);
+                if (widget.onConnectWifi == null && widget.onConnectBluetooth == null) {
+                  return;
+                }
 
-            Theme(
-              data:
-                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                leading: const Icon(
-                  Icons.settings_input_component_outlined,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-                title: const Text(
-                  'Conectar dispositivo',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                // Si solo hay una opción, usar esa directamente
+                if (widget.onConnectWifi != null && widget.onConnectBluetooth == null) {
+                  await Future<void>.delayed(const Duration(milliseconds: 220));
+                  await widget.onConnectWifi!();
+                  return;
+                }
+
+                if (widget.onConnectBluetooth != null && widget.onConnectWifi == null) {
+                  await Future<void>.delayed(const Duration(milliseconds: 220));
+                  await widget.onConnectBluetooth!();
+                  return;
+                }
+
+                // Si hay ambas opciones, mostrar selector
+                if (!context.mounted) return;
+                await Future<void>.delayed(const Duration(milliseconds: 220));
+                // Mostrar diálogo para elegir conexión
+                showDialog(
+                  context: context,
+                  builder: (_) => _ConnectionModeDialog(
+                    onWifiTap: widget.onConnectWifi,
+                    onBluetoothTap: widget.onConnectBluetooth,
                   ),
-                ),
-                subtitle: const Text(
-                  'Wi‑Fi o Bluetooth',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                childrenPadding: const EdgeInsets.only(left: 12, bottom: 4),
-                children: [
-                  _DrawerItem(
-                    icon: Icons.wifi,
-                    label: 'Conectar vía Wi‑Fi',
-                    enabled: widget.onConnectWifi != null,
-                    onTap: () =>
-                        _handleDrawerAction(context, widget.onConnectWifi),
-                  ),
-                  _DrawerItem(
-                    icon: Icons.bluetooth,
-                    label: 'Conectar vía Bluetooth',
-                    enabled: widget.onConnectBluetooth != null,
-                    onTap: () =>
-                        _handleDrawerAction(context, widget.onConnectBluetooth),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
 
             const Spacer(),
@@ -438,6 +431,218 @@ class _DrawerItem extends StatelessWidget {
       ),
       onTap: enabled ? onTap : null,
       horizontalTitleGap: 8,
+    );
+  }
+}
+
+/// Diálogo para elegir entre WiFi o Bluetooth
+class _ConnectionModeDialog extends StatefulWidget {
+  final Future<void> Function()? onWifiTap;
+  final Future<void> Function()? onBluetoothTap;
+
+  const _ConnectionModeDialog({
+    this.onWifiTap,
+    this.onBluetoothTap,
+  });
+
+  @override
+  State<_ConnectionModeDialog> createState() => _ConnectionModeDialogState();
+}
+
+class _ConnectionModeDialogState extends State<_ConnectionModeDialog> {
+  int? _selectedMode; // 0 = WiFi, 1 = Bluetooth
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade50, Colors.cyan.shade50],
+          ),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Título
+            const Text(
+              'Conectar ESP32',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Elige un método de conexión',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Opción WiFi
+            if (widget.onWifiTap != null)
+              _ModeOption(
+                mode: 0,
+                icon: Icons.wifi,
+                title: 'Conectar vía Wi‑Fi',
+                description: 'Red local del ESP32',
+                isSelected: _selectedMode == 0,
+                onTap: () => setState(() => _selectedMode = 0),
+              ),
+            
+            if (widget.onWifiTap != null && widget.onBluetoothTap != null)
+              const SizedBox(height: 12),
+
+            // Opción Bluetooth
+            if (widget.onBluetoothTap != null)
+              _ModeOption(
+                mode: 1,
+                icon: Icons.bluetooth,
+                title: 'Conectar vía Bluetooth',
+                description: 'Emparejamiento BLE',
+                isSelected: _selectedMode == 1,
+                onTap: () => setState(() => _selectedMode = 1),
+              ),
+            
+            const SizedBox(height: 24),
+
+            // Botones
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancelar'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _selectedMode == null
+                        ? null
+                        : () async {
+                            Navigator.pop(context);
+                            if (_selectedMode == 0) {
+                              await widget.onWifiTap?.call();
+                            } else {
+                              await widget.onBluetoothTap?.call();
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade600,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                    ),
+                    child: const Text('Continuar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Widget para una opción de conexión
+class _ModeOption extends StatelessWidget {
+  final int mode;
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ModeOption({
+    required this.mode,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.blue.withOpacity(0.12)
+              : Colors.white.withOpacity(0.5),
+          border: Border.all(
+            color: isSelected
+                ? Colors.blue.shade400
+                : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            // Icono
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.blue.shade100
+                    : Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? Colors.blue.shade600 : Colors.grey.shade600,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Texto
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? Colors.blue.shade900
+                          : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isSelected
+                          ? Colors.blue.shade700
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Radio button
+            Radio<int>(
+              value: mode,
+              groupValue: isSelected ? mode : null,
+              onChanged: (_) => onTap(),
+              activeColor: Colors.blue.shade600,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
